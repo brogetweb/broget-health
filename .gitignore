@@ -13,6 +13,7 @@ android/local.properties
 android/key.properties
 *.jks
 *.keystore
+*.p12
 .idea/
 .vscode/
 emulator-test.log
@@ -24,3 +25,4 @@ android/.kotlin/
 secrets/
 **/firebase-admin*.json
 **/service-account*.json
+**/*firebase-adminsdk*.json

@@ -1,34 +1,42 @@
 {
   "name": "health-broget-api",
-  "version": "1.0.2",
+  "version": "1.1.0",
   "private": true,
   "type": "module",
   "engines": {
     "node": "22"
   },
-  "main": "src/function.js",
+  "main": "src/server.js",
   "scripts": {
-    "dev": "node --env-file=.env.local src/local.js",
+    "dev": "node --env-file=.env.migration.local src/local.js",
     "start": "node src/server.js",
     "check:ai": "node --env-file=.env.local src/check-ai.js",
-    "test": "node --test test/core.test.js test/ai_transport.test.js test/calendar.test.js test/runtime_config.test.js test/hosted_server.test.js",
-    "test:rules": "node --test test/rules.test.js",
-    "check": "node --check src/app.js && node --check src/provider.js && node --check src/tools.js && node --check src/server.js"
+    "db:check": "node --env-file=.env.migration.local src/check-mongo.js",
+    "db:init": "node --env-file=.env.migration.local src/check-mongo.js --initialize",
+    "test": "node --test test/core.test.js test/ai_transport.test.js test/calendar.test.js test/runtime_config.test.js test/hosted_server.test.js test/migration_config.test.js",
+    "test:mongo": "node --test test/mongo.integration.test.js test/mongo_api.test.js",
+    "check": "node --check src/mongo_app.js && node --check src/provider.js && node --check src/tools.js && node --check src/server.js"
   },
   "dependencies": {
+    "cloudinary": "^2.11.0",
     "cors": "^2.8.5",
     "express": "^5.1.0",
     "firebase-admin": "^14.5.0",
-    "firebase-functions": "^7.4.0",
+    "mongodb": "^7.9.0",
     "sharp": "^0.35.5",
     "zod": "^4.1.0"
   },
   "devDependencies": {
-    "@firebase/rules-unit-testing": "^5.0.0",
-    "firebase": "^12.3.0",
+    "mongodb-memory-server": "^11.3.0",
     "supertest": "^7.1.4"
   },
   "overrides": {
-    "@grpc/grpc-js": "1.14.6"
+    "@grpc/grpc-js": "1.14.6",
+    "google-gax": {
+      "rimraf": "^6.1.4"
+    },
+    "gaxios": {
+      "rimraf": "^6.1.4"
+    }
   }
 }
