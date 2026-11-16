@@ -1,3 +1,5 @@
+> Historical document: this describes the earlier Firestore/Render release. For the current MongoDB/Cloudinary/Firebase Auth integration, see [Railway setup](RAILWAY.md) and [migration status](MONGODB_CLOUDINARY_MIGRATION.md).
+
 # Live Firebase and Render setup
 
 BROGET uses Firebase Spark for email/password Authentication and Firestore, and a Render Node Web Service for its API. Do not deploy Firebase Cloud Functions for this setup. Photos are analyzed in memory and never saved. FCM background push delivery is not connected yet.

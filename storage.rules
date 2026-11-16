@@ -1,7 +1,0 @@
-rules_version = '2';
-service firebase.storage {
-  match /b/{bucket}/o {
-    // Photo storage is not enabled in this release.
-    match /{path=**} { allow read, write: if false; }
-  }
-}

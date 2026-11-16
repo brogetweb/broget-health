@@ -1,3 +1,5 @@
+> Historical document: this describes the earlier Firestore/Render release. For the current MongoDB/Cloudinary/Firebase Auth integration, see [Railway setup](RAILWAY.md) and [migration status](MONGODB_CLOUDINARY_MIGRATION.md).
+
 # Verification record
 
 Validation performed on 28 October 2026 in E:\BROGET using Flutter 3.47.5, Dart 3.13.4, Node 23.6.0, Firebase CLI 15.28.2 and local Firebase emulators. Cloud deployment uses Node 22.

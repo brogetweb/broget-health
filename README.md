@@ -1,180 +1,74 @@
 # Health Broget
 
-One Flutter application for Android and responsive Web: public pages, Firebase authentication, onboarding, nutrition profile and deterministic targets, photo recognition, optional reference objects, nutrition lookup, editable confirmed meals, dashboard, daily/weekly/monthly reports, assistant, settings and account deletion. **Photo storage is coming soon.** Only Auth and Firestore are required; scans process photos without saving them.
+Flutter Android/web nutrition journal with photo estimates, an assistant, daily/monthly/yearly reports and an in-app reminder inbox.
 
-Riverpod owns state; GoRouter owns guarded navigation. Firestore repositories supply private reads; authenticated backend endpoints validate all meal mutations. The same Node API runs locally without deployed paid Cloud Functions and as a Firebase HTTPS function in production. Provider credentials never enter Flutter. No fake data is used in application flows.
+## Current stack
 
-Read [Firebase Spark and Render deployment](docs/FIREBASE_AND_RENDER.md), [architecture and tree](ARCHITECTURE.md), [API contract](docs/API.md), [security boundaries](docs/SECURITY.md), [context/report/reminder design](docs/CONTEXT_AND_REMINDERS.md) and [verification record](docs/VALIDATION.md).
+- Firebase Authentication manages accounts, verification and password-reset emails. Firebase App Check protects the production API.
+- MongoDB stores all application data. Flutter accesses it only through the authenticated Node.js API.
+- Cloudinary stores optional meal photos with authenticated delivery. The API checks ownership before issuing a 60-second signed download link.
+- Railway serves the web bundle and `/api` on one HTTPS origin. No Render service, Firestore, Firebase Storage or Cloud Functions deployment is required by this branch.
+- AI and optional USDA nutrition search credentials stay on the backend.
 
-## Requirements
+The migration starts with an empty MongoDB database and a new Firebase Auth project. Old cloud data/services are not deleted by this repository. Existing users must register in the new project. Do not point old APKs at the new API contract; release the updated app after configuration and acceptance testing.
 
-- Flutter 3.47.5 / Dart 3.13.4, the installed validation toolchain. Use committed pubspec.lock.
-- Node 22 for deployment; local tests also run on installed Node 23.6.0.
-- Firebase CLI 15.28.2 or compatible, Java 21+ for emulators, Android SDK/JDK for APKs.
-- Server-only multimodal AI credential and supported model ID, plus a USDA FoodData Central key. Manual label entry works without either API key.
-- Android application ID: `com.broget.broget_ai`.
+## Setup
 
-## Local development without billing
+1. Install Node.js 22 and Flutter 3.47.5 (Dart 3.13.4).
+2. Run `npm ci` in `backend/` and `flutter pub get` at the repository root.
+3. Copy `backend/migration.env.example` to ignored `backend/.env.migration.local`. Set MongoDB, Cloudinary and Firebase server configuration. The provided MongoDB credential is stored only in that ignored file on the development machine; it is not supplied to Flutter or committed.
+4. Configure Email/Password authentication in the new Firebase project. Supply its Web configuration and Android `google-services.json` for package `com.broget.broget_ai`. Configure App Check and authorized app domains.
+5. Use `scripts/configure-firebase.ps1` to prepare ignored `config/production.local.json`. `API_BASE_URL` must end in `/api` for the new backend.
 
-Run from PowerShell in `E:\BROGET`. Install once:
+Use a MongoDB replica set or sharded cluster: a standalone MongoDB service does not support the transactions used for reports and deletion. Use distinct databases/environments for local testing, staging and production.
 
-```powershell
-flutter pub get
-npm.cmd --prefix backend ci
-if (-not (Test-Path backend/.env.local)) { Copy-Item backend/.env.example backend/.env.local }
-```
+## Run and verify locally
 
-The supplied AI key is already configured in ignored `backend/.env.local`. Its configured model must pass real structured generation checks, not just appear in a model listing: listed models can still reject generation for an account. To configure another machine, fill AI_API_KEY and AI_MODEL there. USDA_API_KEY is still needed for online nutrition search; manual label entry works without it. Keep APP_ENV=development and the demo Auth/Firestore emulator hosts until real Firebase configuration is supplied. Keys stay in the backend, never in Dart defines.
-
-Do not overwrite an existing backend/.env.local with the example, since that would erase locally configured credentials. For future setup, copy the example only if the local file does not exist. Recheck credentials with `npm.cmd --prefix backend run check:ai`.
-
-Use three terminals:
+From `backend/`:
 
 ```powershell
-# Terminal 1
-.\scripts\dev-emulators.ps1
+npm run check
+npm test
+npm run test:mongo
+npm run db:check
+# Explicitly create collections/validators/indexes in your configured database:
+npm run db:init
+# With APP_ENV=development and all required local service configuration:
+npm run dev
 ```
 
-```powershell
-# Terminal 2
-npm.cmd --prefix backend run dev
-```
+`test:mongo` uses a pinned, disposable MongoDB 8.2.6 replica set; it never reads the cloud URI. A test binary downloads on first use. API tests use Firebase/Cloudinary/AI test doubles, and the storage tests run real MongoDB transactions. They do not prove real email delivery, device attestation or Cloudinary account configuration.
 
-```powershell
-# Terminal 3
-flutter run -d chrome --web-port 5173 --dart-define-from-file=config/development.example.json
-```
-
-The emulator UI is http://localhost:4000. Auth prints verification/reset links. Create an account, complete onboarding, add a labeled food or search a nutrition source, then scan/review/save and inspect reports. The startup script imports prior exports from ignored .local/firebase-data and exports on a normal Ctrl+C shutdown; wait for export to finish. Killing the process abruptly can still lose unexported test data. Never use production health records for local development.
-
-Reports now include daily, weekly, monthly and yearly views. They use a fixed journal timezone and server-maintained daily totals; older meals are indexed in resumable pages. Yearly views show monthly averages with month drill-down. Settings has user-confirmed assistant notes and reminder preferences. The assistant retrieves bounded recent conversation and relevant nutrition summaries, not the full account history. A private Reminders inbox records eligible prompts and user acknowledgments; FCM background push delivery is not yet connected. The service evaluates in-app reminders after profile load and when the inbox is refreshed.
-
-Android emulator (`flutter devices` lists IDs):
-
-```powershell
-flutter run -d YOUR_DEVICE_ID --dart-define-from-file=config/development.example.json --dart-define=EMULATOR_HOST=10.0.2.2 --dart-define=API_BASE_URL=http://10.0.2.2:8787
-```
-
-A physical phone needs your PC's private LAN IP for both overrides and firewall access to 8787/8080/9099. Emulators/server bind to all interfaces for this workflow: use a trusted private network and never expose development ports publicly. Android uses the system camera flow and Photo Picker, with no broad storage/camera permissions. Photo selection remains available if capture fails; interrupted Android picking is recovered on the scanner page.
-
-## Configuration
-
-Copy an example to ignored `config/*.local.json`; load it with --dart-define-from-file. The client does not load .env files.
-
-| Key | Purpose |
-|---|---|
-| APP_ENV | development, staging or production |
-| USE_EMULATORS | true only for isolated local development |
-| EMULATOR_HOST | localhost, 10.0.2.2, or private PC IP |
-| API_BASE_URL | Local development API or deployed HTTPS function URL, no trailing slash |
-| FIREBASE_API_KEY | Public Firebase client key, never an AI key |
-| FIREBASE_APP_ID | Firebase Web application ID |
-| FIREBASE_ANDROID_APP_ID | Firebase Android application ID |
-| FIREBASE_PROJECT_ID | Project ID |
-| FIREBASE_MESSAGING_SENDER_ID | Public sender identifier |
-| FIREBASE_AUTH_DOMAIN | Authorized Firebase auth domain |
-| RECAPTCHA_SITE_KEY | Production Web App Check Enterprise/Fraud Defense public site key |
-| APP_DOWNLOAD_URL | Optional real HTTPS APK URL; empty hides download button |
-
-Server variables are documented in backend/.env.example and backend/production.env.example. ALLOWED_ORIGINS is a comma-separated list of exact origins with no trailing slash. Authentication and quotas are independent of CORS. Firebase client identifiers are public; AI/USDA keys and service-account credentials are secrets.
-
-The checked build script rejects secrets in client config and rejects emulator/HTTP/demo settings for production/staging. The app also has a runtime guard. CI and distribution must use scripts/build.ps1; raw Flutter commands can bypass the script's build-time checks.
-
-## Firebase setup
-
-Create separate staging and production projects, register Android/Web apps, enable email/password auth, set a 12-character password policy and email enumeration protection, configure authorized domains/action emails, and create Firestore in the intended region. Firebase Storage is not required or initialized. Its dormant deny-all rules are kept as a future safeguard.
-
-Copy public Firebase identifiers into local client config. FirebaseOptions are supplied explicitly. For production native Analytics/Crashlytics service configuration and symbol upload, run FlutterFire CLI against your project and apply its Android service configuration/Gradle integration. Keep this project's explicit Dart configuration as the source of client options. Optional analytics/crash collection starts disabled.
-
-Register Android Play Integrity with release SHA-256 fingerprints, and Web App Check Fraud Defense (reCAPTCHA Enterprise) for real domains. Use the same public Enterprise site key in Firebase App Check and the client configuration. Enable Firestore App Check enforcement and Authentication enforcement where supported after validating client tokens. The production backend independently verifies App Check. Configure appropriate Play Integrity settings for sideloaded APKs and validate on intended devices.
-
-```powershell
-firebase.cmd login
-firebase.cmd deploy --project YOUR_PROJECT_ID --only firestore:rules,firestore:indexes
-```
-
-Queries use automatic single-field timestamp indexes; no composite indexes are required. The default firestore.indexes.json works on Spark without billing. Optional cleanup TTLs for structured analysis, quotas and nutrition searches are in firestore.indexes.blaze.json and require billing. Expired scan results are never served after their logical expiry. On Spark, delete expired cache/quota records with a privileged maintenance process. Images are never persisted, including as Firestore base64 fields.
-
-## Nutrition and regional foods
-
-Meals offers **Scan meal photo** and **Add manually**. The scanner supports Android camera capture and photo uploads. Photo analysis prefills estimated foods, portions, calories and macros, suggests a meal type and uses the photo-selection time. One review dialog lets users edit the meal type, date/time, each food, portions and nutrient values before confirming. Photos are processed without saving them; estimates are approximate, especially for hidden oils and recipes.
-
-Nutrition search separately uses USDA FoodData Central Foundation/SR Legacy/FNDDS and an administrator-managed regional Firestore catalog. Search Indian foods such as roti, chapati, dosa, idli, sambar, dal and biryani; exact availability and recipes depend on the configured sources. AI photo estimates retain distinct attribution from database matches and user-edited values. Users can replace estimates with attributed label values or database matches.
-
-Import reviewed, licensed regional data with Application Default Credentials (or set FIRESTORE_EMULATOR_HOST for local import):
-
-```powershell
-$env:GCLOUD_PROJECT = 'YOUR_PROJECT_ID'
-node scripts/import-foods.mjs PATH_TO_REVIEWED_CATALOG.json
-```
-
-Input: JSON array of objects with id (lowercase slug), searchTerms (normalized exact aliases), and food {name, attribution, per100g {calories, protein, carbs, fat, fiber}}. Fiber may be null. Values must come from a reliable source. Every row is validated; no sample nutrients are shipped as real data. Admin API maintenance requires a server-assigned admin custom claim. No client can grant roles.
-
-## Production backend
-
-**Current deployment choice:** keep Firebase on Spark and host the Node API on Render. Follow [the Firebase and Render guide](docs/FIREBASE_AND_RENDER.md). The hosted entry point is `backend/src/server.js`; `npm start` runs it, while `npm run dev` keeps using the local Firebase emulators. `scripts/deploy-backend.ps1 -CheckOnly` validates the backend without changing cloud resources. The Cloud Functions instructions below describe an optional Blaze alternative and are not required for the selected Render setup.
-
-Cloud Functions deployment requires billing. Until enabled, use the complete local server. The UI/service contract stays the same; there are no client secrets to migrate.
-
-Copy backend/production.env.example to ignored backend/.env.YOUR_PROJECT_ID and fill project, exact origins and a supported multimodal model ID. Store credentials in Secret Manager:
-
-```powershell
-firebase.cmd functions:secrets:set AI_API_KEY --project YOUR_PROJECT_ID
-firebase.cmd functions:secrets:set USDA_API_KEY --project YOUR_PROJECT_ID
-firebase.cmd deploy --only functions --project YOUR_PROJECT_ID
-```
-
-Put the returned api HTTPS function URL in API_BASE_URL. Set budgets/alerts, least-privilege runtime permissions, cleanup policies and logging retention. Server quotas are enforced transactionally. maxInstances limits concurrency, not total spending. The local server requires Auth/Firestore emulators and APP_ENV=development; production refuses emulator hosts.
-
-## Checks
+From the repository root:
 
 ```powershell
 flutter analyze
 flutter test
-npm.cmd --prefix backend run check
-npm.cmd --prefix backend test
-firebase.cmd emulators:exec --config firebase.test.json --project demo-broget --only auth,firestore "npm.cmd --prefix backend run test:rules"
-npm.cmd --prefix backend audit
+flutter run -d chrome --web-port 5173 --dart-define=API_BASE_URL=http://localhost:8787/api
 ```
 
-The test config isolates emulator ports. Tests cover target safeguards, local date/report boundaries, malformed AI/nutrients/images, route guards, responsive layouts, strict schemas, arithmetic, identity/safety filtering, cross-user denial, profile/settings, deletion locks, token authentication, quotas, idempotent meals, disabled photo storage and account deletion. Additional tests exercise legacy migration, date moves/deletion, leap-year summaries, bounded verified chat memory, request retries, reminder consent/quiet hours, deduplicated inbox entries and recorded responses.
+The default Flutter development configuration uses the Firebase Auth emulator. Start it with `scripts/dev-emulators.ps1`, and configure the backend for the same emulator/project. MongoDB is separate; there is no Firestore emulator. For real Firebase in development, supply a private local Dart config and set `USE_EMULATORS=false`.
 
-Fonts and licenses are bundled. Review golden changes before intentionally running flutter test --update-goldens. Actual inference, real App Check, physical camera behavior, signing, store approval and live-service failures require configured service/device validation.
+## Deployment and Android
 
-## Builds and deployment
+See [Railway setup](docs/RAILWAY.md) and [architecture](ARCHITECTURE.md). Railway uses the root Dockerfile, which builds Flutter web and runs the Node.js API as a non-root user. Only explicitly public Firebase identifiers become Flutter build arguments; database, Cloudinary, AI and Admin SDK secrets are runtime-only variables.
 
-```powershell
-.\scripts\build.ps1 -Target web -Config config/production.local.json
-firebase.cmd deploy --only hosting --project YOUR_PROJECT_ID
-```
-
-The build generates public per-route HTML metadata. Hosting clean URLs/fallback rewrites support refresh, back/forward and deep links. Private routes carry noindex headers/metadata. The browser contains the full signed-in product. PWA manifest, branded icons and a limited public-only service worker are included; API traffic and personal data are not service-worker cached. Offline Firebase caches may be readable; AI and meal mutations require a connection.
-
-Release signing is mandatory and never falls back to a debug key. Generate/back up your private signing key using your organization's process, copy android/key.properties.example to ignored android/key.properties, and fill real local values:
+Build a signed Android APK after supplying the new Firebase app configuration and Railway API URL:
 
 ```powershell
 .\scripts\build.ps1 -Target apk -Config config/production.local.json
-.\scripts\build.ps1 -Target appbundle -Config config/production.local.json
 ```
 
-Artifacts: build/app/outputs/flutter-apk/app-release.apk and build/app/outputs/bundle/release/app-release.aab. Configure APP_DOWNLOAD_URL only after hosting a built signed APK. Version comes from pubspec.yaml/package metadata. For a local test APK, use flutter build apk --debug with the same defines as the emulator run command; it is a development artifact.
+Keep the existing private Android signing key so users can install future updates. Never commit or share signing credentials.
 
-## Branding
+## Behaviour and limits
 
-The Health Broget wordmark and matching heart/leaf app icon are in `assets/branding/`. The wordmark retains transparency; the app icon uses a pale mint background. Run `node scripts/generate-icons.mjs` to regenerate Android launcher/splash artwork, web icons and compact assets. See [branding assets and generation prompts](docs/BRANDING.md). Rebuild the APK to update the installed launcher icon.
+- Photo estimates are reviewed and editable before saving. Optional photo retention is selected in the meal review; manual meals work without photos.
+- Meals and daily summary changes commit atomically. Calendar reports preserve the user's reporting timezone.
+- Assistant context uses bounded recent history and summaries, with owner-scoped date tools. AI changes require user confirmation.
+- REST views refresh after successful mutations, when returning to the app and periodically while foregrounded. Data from an old signed-in account is discarded.
+- Account deletion first locks writes, then a retryable worker deletes Cloudinary assets, MongoDB data and Firebase identity. A minimal deletion tombstone prevents stale tokens from recreating data. The UI reports deletion as requested, not immediate completion.
+- Reminders are in-app only. Scheduled FCM background notifications remain a separate future feature.
+- Firebase, MongoDB, Cloudinary, Railway and the AI provider have independent pricing and quotas. Migrating databases does not fix exhausted AI quota.
 
-## Troubleshooting
-
-- Configuration state: verify public Firebase identifiers, platform app ID, backend URL and App Check registration.
-- Manual meals cannot save: start the local API as well as Firebase emulators. Mutations always use server validation.
-- Assistant/search unavailable: supply server keys/model, verify quotas, or use manual labels. Raw provider errors are not exposed.
-- After changing backend code or backend/.env.local, stop the API with Ctrl+C and restart `npm.cmd --prefix backend run dev`. The local process reads its configuration at startup. Run `npm.cmd --prefix backend run check:ai` to test actual generation; model-list access alone does not prove inference availability. Temporary overload retries are bounded and configuration/model failures are surfaced separately.
-- Local Firebase Installations errors: Analytics/Crashlytics have no emulator and must not initialize against the demo key. This app skips those SDKs entirely in emulator mode; fully reload the browser after updating startup code.
-- Web CORS: use port 5173 and include its exact origin in ALLOWED_ORIGINS.
-- Android network: use 10.0.2.2 for the standard emulator. Only the debug manifest permits HTTP.
-- Cross-drive Kotlin cache failures: keep the non-incremental/in-process Gradle settings when SDK/package caches are on C: and the project is on E:.
-- Emulator port conflict: use the isolated test config or inspect the existing process before stopping it; do not terminate unrelated services.
-- Deletion needs fresh sign-in: settings reauthenticates with the password. Retry interrupted deletion after signing in; access stays locked during cleanup.
-- No calorie target: minors, unspecified sex and special care needs intentionally receive no generic calorie prescription.
-
-Before real-user release, configure live services, fill the operator-specific privacy/terms details, review processor/retention agreements, validate physical Android devices and real attestation, exercise the configured model with safety cases and complete release review. Source generation and local tests do not certify production readiness, medical suitability or legal compliance. No deployment or store listing is implied.
+Never paste credentials into issues, commits or chat. Rotate credentials that were exposed in shared messages before production use.

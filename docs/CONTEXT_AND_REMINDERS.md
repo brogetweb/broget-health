@@ -1,3 +1,5 @@
+> Historical document: this describes the earlier Firestore/Render release. For the current MongoDB/Cloudinary/Firebase Auth integration, see [Railway setup](RAILWAY.md) and [migration status](MONGODB_CLOUDINARY_MIGRATION.md).
+
 # Personal context, calendar reporting and reminder records
 
 Each account's source records live in Firestore, not in model RAM. In the local emulator, records are temporary unless exported. Use `scripts/dev-emulators.ps1` to import prior local data and export it on a normal Ctrl+C shutdown. Cloud Firestore is the durable deployment store. No user data or emulator exports should be committed to Git.

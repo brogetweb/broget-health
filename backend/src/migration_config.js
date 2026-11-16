@@ -1,5 +1,5 @@
-// Stage-one configuration boundary for the replacement backend. The deployed
-// Firebase server does not import this module until the migration is complete.
+// Runtime configuration for MongoDB, Cloudinary and Firebase Authentication.
+// Errors identify variable names without echoing credential values.
 function required(env, name) {
   const value = env[name];
   if (typeof value !== 'string' || !value.trim()) throw new Error(`Set ${name}`);
