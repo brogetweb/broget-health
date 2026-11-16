@@ -75,6 +75,29 @@ class TestAuth extends Fake implements FirebaseAuth {
 
 void main() {
   test(
+    'registration accepts six characters and rejects five before calling Firebase',
+    () async {
+      final auth = TestAuth();
+      final repository = AuthRepository(auth);
+      await expectLater(
+        repository.register('Sam', 'sam@example.com', '12345'),
+        throwsA(
+          isA<FirebaseAuthException>().having(
+            (e) => e.code,
+            'code',
+            'weak-password',
+          ),
+        ),
+      );
+      expect(auth.passwordUsed, isNull);
+      expect(
+        await repository.register('Sam', 'sam@example.com', '123456'),
+        isTrue,
+      );
+      expect(auth.passwordUsed, '123456');
+    },
+  );
+  test(
     'registration succeeds even if verification delivery must be retried',
     () async {
       final auth = TestAuth()..user.verificationFails = true;

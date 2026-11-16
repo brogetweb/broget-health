@@ -2,6 +2,8 @@
 
 Flutter Android/web nutrition journal with photo estimates, an assistant, daily/monthly/yearly reports and an in-app reminder inbox.
 
+[Website](https://broget-health-ai.web.app) · [Deployment guide](docs/RENDER.md) · [Architecture](ARCHITECTURE.md) · [Security policy](docs/SECURITY.md)
+
 ## Current stack
 
 - Firebase Authentication manages accounts, verification and password-reset emails. Firebase App Check protects the production API.
@@ -16,7 +18,7 @@ The migration starts with an empty MongoDB database and keeps the existing Fireb
 
 1. Install Node.js 22 and Flutter 3.47.5 (Dart 3.13.4).
 2. Run `npm ci` in `backend/` and `flutter pub get` at the repository root.
-3. Copy `backend/migration.env.example` to ignored `backend/.env.migration.local`. Set MongoDB, Cloudinary and Firebase server configuration. The provided MongoDB credential is stored only in that ignored file on the development machine; it is not supplied to Flutter or committed.
+3. Copy `backend/migration.env.example` to ignored `backend/.env.migration.local`. Set MongoDB, Cloudinary and Firebase server configuration. Keep credentials in ignored local files or private Render variables; never supply them to Flutter or commit them.
 4. Keep Email/Password authentication, existing Web/Android registrations and App Check in Firebase project `broget-health-ai`. Android package remains `com.broget.broget_ai`. Do not delete the Firebase project when clearing old test data.
 5. Use `scripts/configure-firebase.ps1` to prepare ignored `config/production.local.json`. `API_BASE_URL` must be the Render HTTPS service URL followed by `/api`.
 
@@ -63,6 +65,7 @@ Keep the existing private Android signing key so users can install future update
 
 ## Behaviour and limits
 
+- Registration uses a 6-character password minimum. Required fields display a red asterisk, and privacy/terms links preserve the registration form when returning from the policy pages.
 - Photo estimates are reviewed and editable before saving. Optional photo retention is selected in the meal review; manual meals work without photos.
 - Meals and daily summary changes commit atomically. Calendar reports preserve the user's reporting timezone.
 - Assistant context uses bounded recent history and summaries, with owner-scoped date tools. AI changes require user confirmation.
@@ -73,4 +76,4 @@ Keep the existing private Android signing key so users can install future update
 
 Never paste credentials into issues, commits or chat. Rotate credentials that were exposed in shared messages before production use.
 
-The company source repository is https://github.com/brogetweb/broget-health. No further pushes go to the old personal repository.
+Company source repository: [brogetweb/broget-health](https://github.com/brogetweb/broget-health).

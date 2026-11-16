@@ -1,17 +1,47 @@
-# Security review and operating boundaries
+# Security policy and implementation
 
-Authentication and App Check are independent: enable enforcement for Firestore and Firebase Authentication where supported in the production console; the backend verifies attestation itself. Configure email enumeration protection, password policy (12+ characters), authorized domains, Android SHA fingerprints and Play Integrity. No production bypass flag exists. Emulator bypass is accepted only in the separate local server with Auth and Firestore emulator hosts present.
+Security fixes target the current company `main` branch. Deploy the matching backend and client versions and keep dependencies current. This document describes implemented controls and operating requirements; it is not a penetration-test or compliance certification.
 
-Firestore rules permit owner-only reads and strict profile/settings writes. Chat, daily summaries, notes, reminders and audit events are authored through authenticated backend endpoints; direct client chat/summary/event writes are denied. Every meal mutation validates all food items and atomically corrects daily aggregates. Trusted nutrition IDs are resolved on the server, and manual food labels retain explicit user-entered provenance. Stored calorie totals are never client-supplied fields. Nutrient snapshots are estimates and users can intentionally enter their own label values; this is a personal journal, not a clinical record.
+## Reporting a vulnerability
 
-Backend Admin SDK calls bypass Firestore Rules, so each operation derives the path from the verified UID. There is no arbitrary query executor. Account deletion locks access before any cleanup and is retryable after a fresh password sign-in. Minimal deletion locks remain server-only to prevent account-document resurrection during cleanup. Configure a documented retention period for those locks, request logs and backups before public launch.
+Do not post credentials, private health records, session tokens or exploit details in a public issue. Use GitHub's **Report a vulnerability** option when available. If private reporting is unavailable, open an issue requesting a private security contact without including sensitive details; maintainers can arrange a private reporting channel. Never upload service-account JSON or environment files.
 
-Photo storage is coming soon and is disconnected from every active flow. No Storage SDK, bucket initialization, upload or photo download runs. storage.rules is a dormant deny-all safeguard, excluded from current deployment/emulator configuration. Scans are decoded, bounded, resized and re-encoded without original metadata, then sent in memory for analysis. Images are never stored in Firestore as a substitute for a bucket. Only structured recognition and nutrition estimates are retained: analysis caches expire, and private server-only scanFoods snapshots remain until account deletion to support later meal edits. Scan snapshot writes check the active account and deletion lock transactionally. Meal writes reject non-null image paths and resolve AI nutrition against the authenticated user's snapshots rather than trusting client values.
+## Authentication and authorization
 
-Assistant system instructions and deterministic identity/medical prefilters reduce injection and disclosure risk. Outputs are schema-validated and suspicious identities, URLs and implementation disclosures are replaced. This is defense in depth, not a proof that prompt injection or unsafe generated advice is impossible. No generated code, URL, query or write is executed. Test your configured model with adversarial text and image cases before release. Do not record private provider requests/responses in logs.
+- Firebase Authentication manages passwords, account sessions, verification and password-reset emails. MongoDB does not store passwords or Firebase session tokens.
+- The app's minimum password length is **6 characters**, consistent with Firebase's default policy. Registration validation and weak-password messages use one shared constant. Any future Firebase console policy change must be reflected in client validation.
+- The backend verifies Firebase ID-token signature, project/audience, expiry and revocation. Every private query uses the verified UID, not a client-supplied account identifier.
+- Production and staging require Firebase App Check in addition to authentication. Configure authorized web domains, Android signing certificates and the applicable attestation providers. There is no hosted emulator bypass.
+- AI/photo upload and food-search endpoints require verified email. Account deletion requires recent authentication and explicit confirmation. Per-IP and per-account quotas limit API usage.
 
-Optional analytics/crash collection is off initially and requires explicit preference. No custom analytics events include nutrition or chat content. Crash reporting records sanitized exception type and stack. Review native SDK default collection behavior and Firebase data processing settings during deployment.
+## MongoDB data isolation and consistency
 
-The privacy/terms content is an editable policy baseline. A real service operator must supply its legal identity, support contact, processor agreements, region, privacy rights and retention/deletion schedules before public use. This source cannot establish legal compliance, medical suitability, external service availability, penetration-test coverage or store approval.
+Profiles, preferences, meals, chat, summaries, remembered notes, reminder histories, scan estimates and media metadata are stored in MongoDB behind the API. Flutter has no direct database connection, Firestore dependency or arbitrary-query endpoint.
 
-Use least-privilege service accounts, Secret Manager, separate staging/production projects, dependency audits and release signing. Do not commit credentials, keystores, local configuration or Firebase debug logs. Disable verbose Firebase CLI debugging in real environments: it can log emulated records and environment metadata.
+Owner validators and indexes supplement application authorization. Private writes acquire an account serialization fence in a MongoDB transaction. Meal changes update old/new daily totals atomically, and chat request/attempt IDs prevent duplicate or stale completion. Canonical nutrition snapshots are resolved server-side; user-entered label values retain explicit provenance.
+
+Use a transaction-capable replica set or sharded deployment, TLS, a dedicated least-privileged database account and an appropriate network access list. Expired caches and quotas are rejected logically as well as being scheduled for TTL cleanup; TTL deletion is not immediate.
+
+## Cloudinary media
+
+Optional meal photos use authenticated Cloudinary delivery. Images are size-limited, decoded, resized and re-encoded without original metadata. Randomized asset IDs are reserved before upload, and MongoDB records their owner and lifecycle. The API checks ownership before issuing a signed download link that expires after 60 seconds. Treat those temporary URLs as bearer credentials and do not log them.
+
+Meal attachment, replacement and removal update metadata transactionally and queue external cleanup. Failed/abandoned uploads and account deletion use durable retry jobs. MongoDB, Cloudinary and Firebase do not share a transaction; cleanup can be delayed while a service is unavailable or a free Render instance is asleep. A minimal account tombstone prevents stale requests from recreating deleted records. Device/browser caches require separate consideration in the retention policy.
+
+## AI and sensitive data
+
+AI receives relevant photos and bounded nutrition context only when the user invokes those features. Server-owned history, confirmed notes and deterministic summaries form context. Responses are schema-validated, and write tools propose changes for explicit user confirmation. Nutritional estimates are not clinical measurements.
+
+Prompt-injection and disclosure filters are defense in depth, not a guarantee against every unsafe response. No model-generated command or database query is executed. Do not log raw AI requests/responses, uploaded images or health/chat records.
+
+Optional analytics and crash collection are initially disabled and require user preference. Custom analytics must not include nutrition or conversation content. Review SDK collection settings and processor agreements for the actual deployment.
+
+## Credentials, deployment and maintenance
+
+- Store MongoDB, Cloudinary, AI and Firebase Admin credentials only in ignored local files, Render variables or Render Secret Files. Public Firebase client identifiers are distinct from server credentials.
+- Never commit environment files, private keys, signing keys, debug logs or generated private configuration. Run `node scripts/check-secrets.mjs` against the Git index before pushing.
+- Rotate exposed credentials and revoke obsolete keys. Preserve the Android signing identity securely for updates.
+- Use Node.js 22, dependency audits and the checks in the [README](../README.md). Integration tests use disposable local MongoDB instances and test doubles rather than production user data.
+- Follow the [Render deployment guide](RENDER.md), verify health/attestation and perform browser/device acceptance before distributing a release.
+
+The deployed privacy policy and terms still require the service operator's actual legal identity, contact information, processing/retention details and applicable rights. Source code alone cannot establish those legal or operational facts.

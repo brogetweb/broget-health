@@ -5,6 +5,7 @@ import '../../core/config/app_config.dart';
 import '../../core/theme/app_theme.dart';
 import '../../widgets/common.dart';
 import '../../widgets/brand_logo.dart';
+import 'legal_page.dart';
 
 class PublicPage extends StatelessWidget {
   const PublicPage({super.key, required this.path});
@@ -35,7 +36,7 @@ class PublicPage extends StatelessWidget {
       ),
       '/about': (
         'Food awareness, without the noise.',
-        'Meet Health Broget · Version 1.0.2',
+        'Meet Health Broget · Your everyday nutrition companion',
         [
           'Health Broget combines a food journal, photo-assisted recognition, deterministic nutrition tracking and a helpful nutrition assistant.',
           'A photograph cannot reveal exact ingredients, cooking oils or portion weights. All food recognition and nutrition values are estimates.',
@@ -72,6 +73,14 @@ class PublicPage extends StatelessWidget {
         ['Your records are accessible only through your account.'],
       ),
     };
+    if (path == '/privacy' || path == '/terms') {
+      final page = pages[path]!;
+      return LegalPage(
+        privacy: path == '/privacy',
+        description: page.$1,
+        paragraphs: page.$3,
+      );
+    }
     return Scaffold(
       appBar: AppBar(
         title: TextButton(

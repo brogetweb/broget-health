@@ -1,3 +1,4 @@
+import 'package:health_broget/widgets/required_label.dart';
 import 'dart:async';
 import 'package:health_broget/data/models/models.dart';
 import 'package:health_broget/data/repositories/repositories.dart';
@@ -16,7 +17,10 @@ class NamedUser extends Fake implements User {
 }
 
 Finder nameField() => find.byWidgetPredicate(
-  (widget) => widget is TextField && widget.decoration?.labelText == 'Name',
+  (widget) =>
+      widget is TextField &&
+      widget.decoration?.label is RequiredLabel &&
+      (widget.decoration!.label as RequiredLabel).text == 'Name',
 );
 
 void main() {

@@ -1,3 +1,4 @@
+import 'package:health_broget/widgets/required_label.dart';
 import 'package:health_broget/features/authentication/auth_page.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -16,7 +17,9 @@ void main() {
       );
       final password = find.byWidgetPredicate(
         (widget) =>
-            widget is TextField && widget.decoration?.labelText == 'Password',
+            widget is TextField &&
+            widget.decoration?.label is RequiredLabel &&
+            (widget.decoration!.label as RequiredLabel).text == 'Password',
       );
       await tester.enterText(password, 'Example123!');
       await tester.ensureVisible(password);

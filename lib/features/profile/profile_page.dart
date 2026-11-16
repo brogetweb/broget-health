@@ -6,6 +6,7 @@ import '../../data/repositories/repositories.dart';
 import '../../core/errors/app_error.dart';
 import '../../widgets/common.dart';
 import '../../widgets/brand_logo.dart';
+import '../../widgets/required_label.dart';
 
 class ProfilePage extends ConsumerStatefulWidget {
   const ProfilePage({super.key, this.onboarding = false});
@@ -112,7 +113,7 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
   }) => TextFormField(
     controller: c,
     keyboardType: TextInputType.numberWithOptions(decimal: !integer),
-    decoration: InputDecoration(labelText: label),
+    decoration: InputDecoration(label: RequiredLabel(label)),
     validator: (v) {
       final n = double.tryParse(v ?? '');
       return n == null ||
@@ -132,7 +133,9 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
   ) => DropdownButtonFormField<String>(
     initialValue: value,
     isExpanded: true,
-    decoration: InputDecoration(labelText: label),
+    decoration: label == 'Activity level' || label == 'Primary goal'
+        ? InputDecoration(label: RequiredLabel(label))
+        : InputDecoration(labelText: label),
     items: options.entries
         .map((e) => DropdownMenuItem(value: e.key, child: Text(e.value)))
         .toList(),
@@ -151,6 +154,7 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
       subtitle:
           'These details help estimate your needs. Your account and nutrition details are kept separately.',
       children: [
+        const Text('Fields marked * are required.'),
         Panel(
           child: Form(
             key: form,
@@ -163,10 +167,13 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
                 ),
                 const SizedBox(height: 16),
                 TextFormField(
+                  key: const ValueKey('profile-name'),
                   controller: name,
                   onChanged: (_) => nameEdited = true,
                   maxLength: 80,
-                  decoration: const InputDecoration(labelText: 'Name'),
+                  decoration: const InputDecoration(
+                    label: RequiredLabel('Name'),
+                  ),
                   validator: requiredText,
                 ),
                 Text(ref.watch(sessionProvider).value?.email ?? ''),

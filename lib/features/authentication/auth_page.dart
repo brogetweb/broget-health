@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../data/repositories/repositories.dart';
@@ -6,6 +7,10 @@ import '../../core/errors/app_error.dart';
 import '../../core/config/app_config.dart';
 import '../../widgets/common.dart';
 import '../../widgets/brand_logo.dart';
+import '../../widgets/required_label.dart';
+import '../../widgets/password_field.dart';
+import '../../core/config/password_policy.dart';
+import 'terms_consent.dart';
 
 class AuthPage extends ConsumerStatefulWidget {
   const AuthPage({super.key, required this.mode});
@@ -20,7 +25,7 @@ class _AuthPageState extends ConsumerState<AuthPage> {
       email = TextEditingController(),
       password = TextEditingController(),
       confirmation = TextEditingController();
-  bool busy = false, accepted = false, hidden = true, resetSent = false;
+  bool busy = false, resetSent = false;
   final passwordFocus = FocusNode();
   final confirmationFocus = FocusNode();
   String? error;
@@ -36,21 +41,27 @@ class _AuthPageState extends ConsumerState<AuthPage> {
   }
 
   Future<void> submit() async {
+    if (busy) return;
+    // Close the old native editing connection before validation or an async
+    // auth attempt; refocus after failure opens a fresh editable connection.
+    FocusScope.of(context).unfocus();
     if (!form.currentState!.validate()) return;
-    if (widget.mode == 'register' && !accepted) {
-      setState(
-        () => error = 'Please read and accept the privacy policy and terms.',
-      );
-      return;
-    }
+    final enteredName = name.text,
+        enteredEmail = email.text,
+        enteredPassword = password.text;
     setState(() {
       busy = true;
       error = null;
     });
+    bool failed = false;
     try {
       final auth = ref.read(authRepositoryProvider);
       if (widget.mode == 'register') {
-        final sent = await auth.register(name.text, email.text, password.text);
+        final sent = await auth.register(
+          enteredName,
+          enteredEmail,
+          enteredPassword,
+        );
         if (!sent && mounted) {
           notify(
             context,
@@ -58,15 +69,27 @@ class _AuthPageState extends ConsumerState<AuthPage> {
           );
         }
       } else if (widget.mode == 'forgot-password') {
-        await auth.reset(email.text);
+        await auth.reset(enteredEmail);
         if (mounted) setState(() => resetSent = true);
       } else {
-        await auth.login(email.text, password.text);
+        await auth.login(enteredEmail, enteredPassword);
+      }
+      if (widget.mode != 'forgot-password') {
+        TextInput.finishAutofillContext(shouldSave: true);
       }
     } catch (e) {
+      failed = true;
+      TextInput.finishAutofillContext(shouldSave: false);
       if (mounted) setState(() => error = friendlyError(e));
     } finally {
-      if (mounted) setState(() => busy = false);
+      if (mounted) {
+        setState(() => busy = false);
+        if (failed && widget.mode != 'forgot-password') {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted && !busy) passwordFocus.requestFocus();
+          });
+        }
+      }
     }
   }
 
@@ -88,13 +111,17 @@ class _AuthPageState extends ConsumerState<AuthPage> {
       ),
       body: Center(
         child: SingleChildScrollView(
-          padding: const EdgeInsets.all(24),
+          padding: EdgeInsets.all(
+            MediaQuery.sizeOf(context).width < 600 ? 16 : 24,
+          ),
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 460),
             child: Panel(
+              padding: MediaQuery.sizeOf(context).width < 600 ? 20 : 28,
               child: Form(
                 key: form,
                 child: AutofillGroup(
+                  onDisposeAction: AutofillContextAction.cancel,
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
@@ -120,9 +147,10 @@ class _AuthPageState extends ConsumerState<AuthPage> {
                         ),
                       if (register) ...[
                         TextFormField(
+                          key: const ValueKey('auth-name'),
                           controller: name,
                           decoration: const InputDecoration(
-                            labelText: 'Your name',
+                            label: RequiredLabel('Your name'),
                           ),
                           maxLength: 80,
                           autofillHints: const [AutofillHints.name],
@@ -131,9 +159,10 @@ class _AuthPageState extends ConsumerState<AuthPage> {
                         const SizedBox(height: 12),
                       ],
                       TextFormField(
+                        key: const ValueKey('auth-email'),
                         controller: email,
                         decoration: const InputDecoration(
-                          labelText: 'Email address',
+                          label: RequiredLabel('Email address'),
                         ),
                         keyboardType: TextInputType.emailAddress,
                         autofillHints: const [AutofillHints.email],
@@ -141,92 +170,70 @@ class _AuthPageState extends ConsumerState<AuthPage> {
                       ),
                       const SizedBox(height: 16),
                       if (!reset) ...[
-                        TextFormField(
+                        PasswordField(
+                          key: const ValueKey('auth-password'),
                           controller: password,
                           focusNode: passwordFocus,
-                          keyboardType: TextInputType.visiblePassword,
-                          autocorrect: false,
-                          enableSuggestions: false,
-                          obscureText: hidden,
-                          decoration: InputDecoration(
-                            labelText: 'Password',
-                            suffixIcon: IconButton(
-                              // Keep keyboard editing in the field after an eye click.
-                              onPressed: () {
-                                final focus = confirmationFocus.hasFocus
-                                    ? confirmationFocus
-                                    : passwordFocus;
-                                setState(() => hidden = !hidden);
-                                focus.requestFocus();
-                              },
-                              tooltip: hidden
-                                  ? 'Show password'
-                                  : 'Hide password',
-                              icon: Icon(
-                                hidden
-                                    ? Icons.visibility_off_outlined
-                                    : Icons.visibility_outlined,
-                              ),
-                            ),
-                          ),
-                          autofillHints: [
-                            register
-                                ? AutofillHints.newPassword
-                                : AutofillHints.password,
-                          ],
-                          validator: (v) => v == null || v.isEmpty
-                              ? 'Enter your password'
-                              : register && v.length < 12
-                              ? 'Use at least 12 characters'
+                          label: 'Password',
+                          newPassword: register,
+                          helperText: register
+                              ? 'At least $minimumPasswordLength characters'
                               : null,
-                          onFieldSubmitted: (_) {
-                            if (!register && !busy) submit();
+                          validator: validatePassword,
+                          onSubmitted: (_) {
+                            if (register) {
+                              confirmationFocus.requestFocus();
+                            } else if (!busy) {
+                              submit();
+                            }
                           },
                         ),
                         const SizedBox(height: 16),
                       ],
                       if (register) ...[
-                        TextFormField(
+                        PasswordField(
+                          key: const ValueKey('auth-confirmation'),
                           controller: confirmation,
                           focusNode: confirmationFocus,
-                          keyboardType: TextInputType.visiblePassword,
-                          autocorrect: false,
-                          enableSuggestions: false,
-                          obscureText: hidden,
-                          decoration: const InputDecoration(
-                            labelText: 'Confirm password',
-                          ),
-                          validator: (v) => v != password.text
+                          label: 'Confirm password',
+                          newPassword: true,
+                          confirmation: true,
+                          validator: (v) => v == null || v.isEmpty
+                              ? 'Confirm your password'
+                              : v != password.text
                               ? 'Passwords must match'
                               : null,
+                          onSubmitted: (_) {
+                            if (!busy) submit();
+                          },
                         ),
-                        CheckboxListTile(
-                          contentPadding: EdgeInsets.zero,
-                          value: accepted,
-                          onChanged: busy
-                              ? null
-                              : (v) => setState(() => accepted = v!),
-                          title: const Text(
-                            'I accept the privacy policy and terms.',
-                          ),
-                        ),
-                        Wrap(
-                          children: [
-                            TextButton(
-                              onPressed: () => context.push('/privacy'),
-                              child: const Text('Privacy policy'),
-                            ),
-                            TextButton(
-                              onPressed: () => context.push('/terms'),
-                              child: const Text('Terms of service'),
-                            ),
-                          ],
-                        ),
+                        const SizedBox(height: 20),
+                        const TermsConsent(),
+                        const SizedBox(height: 20),
                       ],
                       if (error != null)
                         Padding(
                           padding: const EdgeInsets.symmetric(vertical: 12),
-                          child: Text(error!),
+                          child: Semantics(
+                            liveRegion: true,
+                            child: Container(
+                              padding: const EdgeInsets.all(12),
+                              decoration: BoxDecoration(
+                                color: Theme.of(
+                                  context,
+                                ).colorScheme.errorContainer,
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: Text(
+                                error!,
+                                style: TextStyle(
+                                  color: Theme.of(
+                                    context,
+                                  ).colorScheme.onErrorContainer,
+                                ),
+                              ),
+                            ),
+                          ),
                         ),
                       if (resetSent)
                         const Padding(

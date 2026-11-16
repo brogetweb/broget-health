@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:firebase_core/firebase_core.dart';
+import '../config/password_policy.dart';
 
 class AppError implements Exception {
   const AppError(this.code);
@@ -57,7 +58,8 @@ String friendlyError(Object error) {
     'user-not-found' => 'The email or password is incorrect.',
     'email-already-in-use' =>
       'An account already uses this email. Try signing in.',
-    'weak-password' => 'Use at least 12 characters for your password.',
+    'weak-password' =>
+      'Use at least $minimumPasswordLength characters for your password.',
     'invalid-email' => 'Enter a valid email address.',
     'too-many-requests' || 'rate-limited' =>
       'You have made several requests. Please wait a little before trying again.',

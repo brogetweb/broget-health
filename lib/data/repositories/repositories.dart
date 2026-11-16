@@ -1,4 +1,5 @@
 import '../../services/api_watch.dart';
+import '../../core/config/password_policy.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/models.dart';
@@ -68,6 +69,9 @@ class AuthRepository {
   }
 
   Future<bool> register(String name, String email, String password) async {
+    if (password.length < minimumPasswordLength) {
+      throw FirebaseAuthException(code: 'weak-password');
+    }
     final credential = await auth.createUserWithEmailAndPassword(
       email: email.trim(),
       password: password,
