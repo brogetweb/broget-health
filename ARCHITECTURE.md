@@ -28,6 +28,6 @@ Reminder generation respects consent, preferences and quiet hours; duplicate rem
 
 ## Deployment
 
-Railway hosts Flutter web and `/api` from one service. Web assets are built using public Firebase values only; server credentials are runtime environment variables. Android uses the same API and its own Firebase app registration. The existing Android package/signing identity is retained. Integration is developed on a separate branch to avoid triggering the old Render deployment from main before cutover.
+Render hosts the Node.js API; Firebase Hosting keeps the web app. CORS permits only the configured Hosting origins, and production requires Firebase App Check. Both clients retain project broget-health-ai and the existing Android package/signing identity. Server credentials are runtime-only variables or a Render secret file. MongoDB health_broget stores application data and Cloudinary stores private photos. The company repository is brogetweb/broget-health; deployments remain manual until configuration and acceptance checks pass.
 
-See [migration status](docs/MONGODB_CLOUDINARY_MIGRATION.md) and [deployment](docs/RAILWAY.md).
+See [migration status](docs/MONGODB_CLOUDINARY_MIGRATION.md) and [deployment](docs/RENDER.md).

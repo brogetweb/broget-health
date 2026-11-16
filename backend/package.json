@@ -12,6 +12,7 @@
     "start": "node src/server.js",
     "check:ai": "node --env-file=.env.local src/check-ai.js",
     "db:check": "node --env-file=.env.migration.local src/check-mongo.js",
+    "check:cloudinary": "node --env-file=.env.migration.local src/check-cloudinary.js",
     "db:init": "node --env-file=.env.migration.local src/check-mongo.js --initialize",
     "test": "node --test test/core.test.js test/ai_transport.test.js test/calendar.test.js test/runtime_config.test.js test/hosted_server.test.js test/migration_config.test.js",
     "test:mongo": "node --test test/mongo.integration.test.js test/mongo_api.test.js",

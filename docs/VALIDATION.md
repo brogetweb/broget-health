@@ -1,4 +1,4 @@
-> Historical document: this describes the earlier Firestore/Render release. For the current MongoDB/Cloudinary/Firebase Auth integration, see [Railway setup](RAILWAY.md) and [migration status](MONGODB_CLOUDINARY_MIGRATION.md).
+> Historical document: this describes the earlier Firestore/Render release. For the current MongoDB/Cloudinary/Firebase Auth integration, see [Render setup](RENDER.md) and [migration status](MONGODB_CLOUDINARY_MIGRATION.md).
 
 # Verification record
 

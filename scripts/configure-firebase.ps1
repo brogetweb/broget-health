@@ -10,7 +10,7 @@ $android = Get-Content -LiteralPath 'android/app/google-services.json' -Raw -Enc
 $client = @($android.client | Where-Object { $_.client_info.android_client_info.package_name -eq 'com.broget.broget_ai' })[0]
 if (-not $client) { throw 'google-services.json must contain com.broget.broget_ai.' }
 $project = $android.project_info.project_id
-if (-not $project -or $project.StartsWith('demo-')) { throw 'Provide the Android configuration from your new live Firebase project.' }
+if (-not $project -or $project.StartsWith('demo-')) { throw 'Provide the Android configuration from the existing Firebase project.' }
 $target = Join-Path $root 'config/production.local.json'
 $settings = Get-Content -LiteralPath 'config/production.example.json' -Raw -Encoding UTF8 | ConvertFrom-Json
 if (Test-Path -LiteralPath $target) { $settings = Get-Content -LiteralPath $target -Raw -Encoding UTF8 | ConvertFrom-Json }
@@ -37,9 +37,9 @@ if ($SiteKey) { $settings.RECAPTCHA_SITE_KEY = $SiteKey }
 if ($ApiUrl) { $settings.API_BASE_URL = $ApiUrl }
 if ($settings.API_BASE_URL -and ([Uri]$settings.API_BASE_URL).AbsolutePath -ne '/api') {
   $settings.API_BASE_URL = ''
-  Write-Output 'Set ApiUrl to the new Railway HTTPS origin followed by /api.'
+  Write-Output 'Set ApiUrl to the Render HTTPS origin followed by /api.'
 }
 $settings | ConvertTo-Json | Set-Content -LiteralPath $target -Encoding UTF8
-Write-Output "Prepared ignored client configuration for $project. Railway environment values are documented in backend/railway.env.example."
+Write-Output "Prepared ignored client configuration for $project. Render environment values are documented in backend/render.env.example."
 $missing = @('FIREBASE_API_KEY','FIREBASE_APP_ID','API_BASE_URL','RECAPTCHA_SITE_KEY') | Where-Object { -not $settings.$_ }
 if ($missing) { Write-Output ('Still required before web production: ' + ($missing -join ', ')) }

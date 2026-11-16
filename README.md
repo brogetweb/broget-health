@@ -7,18 +7,18 @@ Flutter Android/web nutrition journal with photo estimates, an assistant, daily/
 - Firebase Authentication manages accounts, verification and password-reset emails. Firebase App Check protects the production API.
 - MongoDB stores all application data. Flutter accesses it only through the authenticated Node.js API.
 - Cloudinary stores optional meal photos with authenticated delivery. The API checks ownership before issuing a 60-second signed download link.
-- Railway serves the web bundle and `/api` on one HTTPS origin. No Render service, Firestore, Firebase Storage or Cloud Functions deployment is required by this branch.
+- Render hosts the Node.js backend at `/api`. The existing Firebase Hosting website and Firebase Authentication project are retained. Firestore, Firebase Storage and Cloud Functions are not used for application data.
 - AI and optional USDA nutrition search credentials stay on the backend.
 
-The migration starts with an empty MongoDB database and a new Firebase Auth project. Old cloud data/services are not deleted by this repository. Existing users must register in the new project. Do not point old APKs at the new API contract; release the updated app after configuration and acceptance testing.
+The migration starts with an empty MongoDB database and keeps the existing Firebase Auth project (`broget-health-ai`). Existing Auth users can keep signing in and complete fresh MongoDB profiles. Old Firestore records are not imported or deleted by this repository. Do not point old APKs at the new API contract; release the updated app after configuration and acceptance testing.
 
 ## Setup
 
 1. Install Node.js 22 and Flutter 3.47.5 (Dart 3.13.4).
 2. Run `npm ci` in `backend/` and `flutter pub get` at the repository root.
 3. Copy `backend/migration.env.example` to ignored `backend/.env.migration.local`. Set MongoDB, Cloudinary and Firebase server configuration. The provided MongoDB credential is stored only in that ignored file on the development machine; it is not supplied to Flutter or committed.
-4. Configure Email/Password authentication in the new Firebase project. Supply its Web configuration and Android `google-services.json` for package `com.broget.broget_ai`. Configure App Check and authorized app domains.
-5. Use `scripts/configure-firebase.ps1` to prepare ignored `config/production.local.json`. `API_BASE_URL` must end in `/api` for the new backend.
+4. Keep Email/Password authentication, existing Web/Android registrations and App Check in Firebase project `broget-health-ai`. Android package remains `com.broget.broget_ai`. Do not delete the Firebase project when clearing old test data.
+5. Use `scripts/configure-firebase.ps1` to prepare ignored `config/production.local.json`. `API_BASE_URL` must be the Render HTTPS service URL followed by `/api`.
 
 Use a MongoDB replica set or sharded cluster: a standalone MongoDB service does not support the transactions used for reports and deletion. Use distinct databases/environments for local testing, staging and production.
 
@@ -51,9 +51,9 @@ The default Flutter development configuration uses the Firebase Auth emulator. S
 
 ## Deployment and Android
 
-See [Railway setup](docs/RAILWAY.md) and [architecture](ARCHITECTURE.md). Railway uses the root Dockerfile, which builds Flutter web and runs the Node.js API as a non-root user. Only explicitly public Firebase identifiers become Flutter build arguments; database, Cloudinary, AI and Admin SDK secrets are runtime-only variables.
+See [Render setup](docs/RENDER.md) and [architecture](ARCHITECTURE.md). Use a Render **Node** service, root directory `backend`, build `npm ci --omit=dev`, start `npm start`, health path `/health`. Import runtime variables privately and retain the Firebase Admin SDK secret file. Build/deploy Flutter web to the existing Firebase Hosting site only after the updated backend is healthy.
 
-Build a signed Android APK after supplying the new Firebase app configuration and Railway API URL:
+Build a signed Android APK after supplying the existing Firebase app configuration and Render API URL:
 
 ```powershell
 .\scripts\build.ps1 -Target apk -Config config/production.local.json
@@ -69,6 +69,8 @@ Keep the existing private Android signing key so users can install future update
 - REST views refresh after successful mutations, when returning to the app and periodically while foregrounded. Data from an old signed-in account is discarded.
 - Account deletion first locks writes, then a retryable worker deletes Cloudinary assets, MongoDB data and Firebase identity. A minimal deletion tombstone prevents stale tokens from recreating data. The UI reports deletion as requested, not immediate completion.
 - Reminders are in-app only. Scheduled FCM background notifications remain a separate future feature.
-- Firebase, MongoDB, Cloudinary, Railway and the AI provider have independent pricing and quotas. Migrating databases does not fix exhausted AI quota.
+- Firebase, MongoDB, Cloudinary, Render and the AI provider have independent pricing and quotas. Migrating databases does not fix exhausted AI quota.
 
 Never paste credentials into issues, commits or chat. Rotate credentials that were exposed in shared messages before production use.
+
+The company source repository is https://github.com/brogetweb/broget-health. No further pushes go to the old personal repository.

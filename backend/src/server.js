@@ -19,7 +19,8 @@ try {
   const identity = firebaseIdentity(config.firebase);
   const transport = cloudinaryTransport(config.cloudinary);
   const media = mediaStore(database, transport), worker = cleanupWorker(database, transport, identity.auth);
-  const app = createApp({ database, identity, media, worker, production: config.production, publicAppOrigin: config.publicAppOrigin });
+  const app = createApp({ database, identity, media, worker, production: config.production,
+    publicAppOrigin: config.publicAppOrigin, allowedOrigins: config.allowedOrigins });
   const web = process.env.WEB_DIST_PATH ? resolve(process.env.WEB_DIST_PATH) : fileURLToPath(new URL('../../build/web/', import.meta.url));
   if (existsSync(resolve(web, 'index.html'))) {
     app.use(express.static(web, { dotfiles: 'deny', setHeaders: res => res.set('Cache-Control', 'no-cache') }));

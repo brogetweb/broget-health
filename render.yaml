@@ -1,0 +1,39 @@
+services:
+  - type: web
+    name: broget-health-api
+    runtime: node
+    plan: free
+    repo: https://github.com/brogetweb/broget-health
+    branch: main
+    rootDir: backend
+    buildCommand: npm ci --omit=dev
+    startCommand: npm start
+    healthCheckPath: /health
+    autoDeployTrigger: "off"
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      - key: APP_ENV
+        value: production
+      - key: FIREBASE_PROJECT_ID
+        value: broget-health-ai
+      - key: PUBLIC_APP_ORIGIN
+        value: https://broget-health-ai.web.app
+      - key: ADDITIONAL_APP_ORIGINS
+        value: https://broget-health-ai.firebaseapp.com
+      - key: GOOGLE_APPLICATION_CREDENTIALS
+        value: /etc/secrets/firebase-admin.json
+      - key: MONGODB_DB_NAME
+        value: health_broget
+      - key: MONGODB_URI
+        sync: false
+      - key: CLOUDINARY_CLOUD_NAME
+        sync: false
+      - key: CLOUDINARY_API_KEY
+        sync: false
+      - key: CLOUDINARY_API_SECRET
+        sync: false
+      - key: AI_API_KEY
+        sync: false
+      - key: AI_MODEL
+        sync: false

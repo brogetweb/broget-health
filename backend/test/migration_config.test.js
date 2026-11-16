@@ -48,3 +48,11 @@ test('Firebase identity requires an explicit live project and server credential 
   assert.throws(() => migrationConfig({ ...base, GOOGLE_APPLICATION_CREDENTIALS: '' }));
   assert.equal(migrationConfig({ ...base, GOOGLE_APPLICATION_CREDENTIALS: '', FIREBASE_SERVICE_ACCOUNT_JSON: '{"type":"service_account"}' }).firebase.credentialPath, null);
 });
+
+test('separate Firebase Hosting origins are explicit and reject insecure or path-based entries', () => {
+  assert.deepEqual(migrationConfig({ ...base, ADDITIONAL_APP_ORIGINS: 'https://app.example.com, https://project.firebaseapp.com' }).allowedOrigins,
+    ['https://app.example.com', 'https://project.firebaseapp.com']);
+  for (const value of ['http://evil.example.com', 'https://example.com/path', 'https://user:pass@example.com']) {
+    assert.throws(() => migrationConfig({ ...base, ADDITIONAL_APP_ORIGINS: value }));
+  }
+});

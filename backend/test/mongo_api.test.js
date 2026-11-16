@@ -42,6 +42,7 @@ before(async () => {
   database = await connectDatabase({ uri: replica.getUri(), database: 'api_test' });
   media = mediaStore(database, transport); worker = cleanupWorker(database, transport, identity.auth);
   app = createApp({ database, identity, media, worker, ai, publicAppOrigin: 'https://app.example.com', production: true,
+    allowedOrigins: ['https://app.example.com', 'https://project.firebaseapp.com'],
     nutrition: { search: async () => [] } });
   photo = (await sharp({ create: { width: 16, height: 16, channels: 3, background: '#88aa66' } }).png().toBuffer()).toString('base64');
 }, { timeout: 60000 });
@@ -50,6 +51,17 @@ const call = (user, method, path) => request(app)[method](`/api${path}`).set('Au
 const meal = (id = randomUUID()) => ({ id, mealType: 'lunch', eatenAt: '2026-01-15T12:00:00Z', timeZone: 'Asia/Kolkata', imagePath: null,
   foods: [{ food: { id: 'label:rice', name: 'Rice', attribution: 'User-entered label: rice',
     per100g: { calories: 130, protein: 3, carbs: 28, fat: 1, fiber: null } }, grams: 100, source: 'user_entered', confidence: null }] });
+
+test('Render CORS allows explicit Firebase Hosting domains and rejects an unknown website', async () => {
+  for (const origin of ['https://app.example.com', 'https://project.firebaseapp.com']) {
+    const result = await request(app).options('/api/profile').set('Origin', origin)
+      .set('Access-Control-Request-Method', 'GET').set('Access-Control-Request-Headers', 'authorization,x-firebase-appcheck');
+    assert.equal(result.status, 204); assert.equal(result.headers['access-control-allow-origin'], origin);
+  }
+  const unknown = await request(app).options('/api/profile').set('Origin', 'https://unknown.example.com')
+    .set('Access-Control-Request-Method', 'GET');
+  assert.equal(unknown.headers['access-control-allow-origin'], undefined);
+});
 
 test('API rejects absent/expired tokens, invalid attestation and forged profile identity', async () => {
   assert.equal((await request(app).get('/api/profile')).status, 401);

@@ -17,7 +17,7 @@ import { AiTransportError } from './ai_transport.js';
 import { scanSchema, chatSchema, mealSchema, directAnswer, foodSchema, dateRangeSchema } from './contracts.js';
 import { reportRangeSchema, timeZoneSchema } from './calendar.js';
 
-export function createApp({ database, identity, media, worker, publicAppOrigin, production = true, ai = provider, nutrition = nutritionStore(database) }) {
+export function createApp({ database, identity, media, worker, publicAppOrigin, allowedOrigins = [publicAppOrigin], production = true, ai = provider, nutrition = nutritionStore(database) }) {
   const app = express(), api = express.Router(), { db } = database;
   const users = userStore(database), meals = mealStore(database), chat = chatStore(database), reminders = reminderStore(database);
   const tools = assistantTools(database, meals, users, nutrition);
@@ -33,7 +33,7 @@ export function createApp({ database, identity, media, worker, publicAppOrigin, 
     res.set('Cache-Control', 'no-store').status(ready ? 200 : 503).json({ status: ready ? 'ok' : 'unavailable', name: 'Health Broget', database: 'mongodb' });
   });
   api.use((req, res, next) => { res.set({ 'Cache-Control': 'no-store', 'X-Request-ID': randomUUID() }); next(); });
-  api.use(cors({ origin: (origin, done) => done(null, !origin || origin === publicAppOrigin),
+  api.use(cors({ origin: (origin, done) => done(null, !origin || allowedOrigins.includes(origin)),
     methods: ['GET', 'POST', 'PUT', 'DELETE'], allowedHeaders: ['Content-Type', 'Authorization', 'X-Firebase-AppCheck'] }));
   api.use(express.json({ limit: '3mb' }));
   api.use(async (req, res, next) => {

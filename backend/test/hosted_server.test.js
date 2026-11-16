@@ -9,7 +9,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { MongoMemoryReplSet } from 'mongodb-memory-server';
 
-test('Railway entry starts with MongoDB and protects API routes without using emulators', { timeout: 60000 }, async () => {
+test('Render entry starts with MongoDB and protects API routes without using emulators', { timeout: 60000 }, async () => {
   const replica = await MongoMemoryReplSet.create({ binary: { version: '8.2.6' }, replSet: { count: 1 } });
   const reservation = createServer();
   reservation.listen(0, '127.0.0.1');

@@ -34,17 +34,26 @@ export function migrationConfig(env) {
         ['localhost', '127.0.0.1', '[::1]'].includes(origin.hostname)))) {
     throw new Error('PUBLIC_APP_ORIGIN must be an HTTPS origin (local HTTP is development only)');
   }
+  const allowedOrigins = [origin.origin];
+  for (const extra of (env.ADDITIONAL_APP_ORIGINS ?? '').split(',').map(value => value.trim()).filter(Boolean)) {
+    let parsed;
+    try { parsed = new URL(extra); } catch { throw new Error('Invalid ADDITIONAL_APP_ORIGINS'); }
+    if (parsed.protocol !== 'https:' || parsed.origin !== extra || parsed.username || parsed.password) {
+      throw new Error('ADDITIONAL_APP_ORIGINS must contain HTTPS origins without paths');
+    }
+    allowedOrigins.push(extra);
+  }
   const cloudName = required(env, 'CLOUDINARY_CLOUD_NAME');
   if (!/^[A-Za-z0-9_-]+$/.test(cloudName)) throw new Error('Invalid CLOUDINARY_CLOUD_NAME');
   const projectId = required(env, 'FIREBASE_PROJECT_ID');
   if (!/^[a-z][a-z0-9-]{4,28}[a-z0-9]$/.test(projectId) || ((production || env.APP_ENV === 'staging') && projectId.startsWith('demo-'))) {
-    throw new Error('FIREBASE_PROJECT_ID must identify the new live Firebase project');
+    throw new Error('FIREBASE_PROJECT_ID must identify a live Firebase project');
   }
   const credentialPath = env.GOOGLE_APPLICATION_CREDENTIALS?.trim() || null;
   const serviceAccountJson = env.FIREBASE_SERVICE_ACCOUNT_JSON?.trim() || null;
   if (!credentialPath && !serviceAccountJson) throw new Error('Set GOOGLE_APPLICATION_CREDENTIALS or FIREBASE_SERVICE_ACCOUNT_JSON');
   return Object.freeze({
-    production, publicAppOrigin: origin.origin,
+    production, publicAppOrigin: origin.origin, allowedOrigins: Object.freeze([...new Set(allowedOrigins)]),
     mongo: Object.freeze({ uri, database }),
     cloudinary: Object.freeze({ cloudName, apiKey: required(env, 'CLOUDINARY_API_KEY'),
       apiSecret: required(env, 'CLOUDINARY_API_SECRET') }),
