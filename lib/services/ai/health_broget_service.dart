@@ -49,6 +49,20 @@ class ChatReply {
 class HealthBrogetApi implements HealthBrogetService {
   HealthBrogetApi(this.client);
   final http.Client client;
+  final _changes = StreamController<void>.broadcast();
+  Stream<void> get changes => _changes.stream;
+  void refreshData() {
+    if (!_changes.isClosed) _changes.add(null);
+  }
+
+  String? get currentUserId => FirebaseAuth.instance.currentUser?.uid;
+  Future<T> forUser<T>(String uid, Future<T> Function() action) async {
+    if (currentUserId != uid) throw const AppError('sign-in-required');
+    final result = await action();
+    if (currentUserId != uid) throw const AppError('sign-in-required');
+    return result;
+  }
+
   Future<String>? _timeZone;
   Future<String> get timeZone => _timeZone ??=
       FlutterTimezone.getLocalTimezone().then((zone) => zone.identifier);
@@ -73,7 +87,11 @@ class HealthBrogetApi implements HealthBrogetService {
     );
   }
 
-  void dispose() => client.close();
+  void dispose() {
+    client.close();
+    _changes.close();
+  }
+
   Future<Map<String, dynamic>> request(
     String method,
     String path, [
@@ -95,10 +113,19 @@ class HealthBrogetApi implements HealthBrogetService {
     final response = await (() async => http.Response.fromStream(
       await client.send(req),
     ))().timeout(const Duration(seconds: 145));
-    final data = jsonDecode(response.body) as Map<String, dynamic>;
+    if (FirebaseAuth.instance.currentUser?.uid != user.uid) {
+      throw const AppError('sign-in-required');
+    }
+    Map<String, dynamic> data;
+    try {
+      data = jsonDecode(response.body) as Map<String, dynamic>;
+    } catch (_) {
+      throw const AppError('service-unavailable');
+    }
     if (response.statusCode >= 400) {
       throw AppError(data['code'] as String? ?? 'service-unavailable');
     }
+    if (method != 'GET') refreshData();
     return data;
   }
 
@@ -171,6 +198,16 @@ class HealthBrogetApi implements HealthBrogetService {
 
   Future<void> clearChat() async {
     await request('DELETE', '/chat');
+  }
+
+  Future<String> uploadPhoto(Uint8List image) async =>
+      (await request('POST', '/media', {'image': base64Encode(image)}))['id']
+          as String;
+  Future<String> photoUrl(String id) async =>
+      (await request('GET', '/media/${Uri.encodeComponent(id)}'))['url']
+          as String;
+  Future<void> discardPhoto(String id) async {
+    await request('DELETE', '/media/${Uri.encodeComponent(id)}');
   }
 
   Future<void> deleteAccount() async {

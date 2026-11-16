@@ -5,7 +5,6 @@ import 'package:flutter_web_plugins/url_strategy.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_app_check/firebase_app_check.dart';
 import 'package:firebase_analytics/firebase_analytics.dart';
 import 'package:firebase_crashlytics/firebase_crashlytics.dart';
@@ -24,10 +23,6 @@ Future<void> main() async {
     await Firebase.initializeApp(options: AppConfig.firebase);
     if (AppConfig.emulators) {
       await FirebaseAuth.instance.useAuthEmulator(AppConfig.emulatorHost, 9099);
-      FirebaseFirestore.instance.useFirestoreEmulator(
-        AppConfig.emulatorHost,
-        8080,
-      );
     } else {
       await FirebaseAppCheck.instance.activate(
         providerAndroid: const AndroidPlayIntegrityProvider(),

@@ -111,7 +111,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
       await ref.read(authRepositoryProvider).reauthenticate(enteredPassword);
       await ref.read(apiProvider).deleteAccount();
       await FirebaseAuth.instance.signOut();
-    }, 'Your account and associated data were deleted');
+    }, 'Your account is locked and deletion has been requested');
   }
 
   @override
@@ -161,9 +161,9 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
               const ListTile(
                 contentPadding: EdgeInsets.zero,
                 leading: Icon(Icons.photo_library_outlined),
-                title: Text('Photo storage — coming soon'),
+                title: Text('Private meal photos'),
                 subtitle: Text(
-                  'Food photos are processed for analysis without being saved. Your meal records are saved in your private journal.',
+                  'Choose whether to keep each scanned photo with your meal. Remove a saved photo by editing or deleting its meal.',
                 ),
               ),
               SwitchListTile(

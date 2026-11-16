@@ -1,5 +1,4 @@
-import 'dart:async';
-import 'package:cloud_firestore/cloud_firestore.dart';
+import '../../services/api_watch.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/models.dart';
@@ -12,7 +11,7 @@ final sessionProvider = StreamProvider<User?>(
   (ref) => ref.watch(authRepositoryProvider).changes,
 );
 final userRepositoryProvider = Provider(
-  (ref) => UserRepository(FirebaseFirestore.instance),
+  (ref) => UserRepository(ref.watch(apiProvider)),
 );
 final profileProvider = StreamProvider<UserProfile?>((ref) {
   final user = ref.watch(sessionProvider).value;
@@ -21,7 +20,7 @@ final profileProvider = StreamProvider<UserProfile?>((ref) {
       : ref.watch(userRepositoryProvider).watch(user.uid);
 });
 final mealRepositoryProvider = Provider(
-  (ref) => MealRepository(FirebaseFirestore.instance, ref.watch(apiProvider)),
+  (ref) => MealRepository(ref.watch(apiProvider)),
 );
 final selectedDayProvider = NotifierProvider<SelectedDay, DateTime>(
   SelectedDay.new,
@@ -48,7 +47,7 @@ final settingsProvider = StreamProvider<AppSettings>((ref) {
       : ref.watch(userRepositoryProvider).settings(uid);
 });
 final chatRepositoryProvider = Provider(
-  (ref) => ChatRepository(FirebaseFirestore.instance),
+  (ref) => ChatRepository(ref.watch(apiProvider)),
 );
 final chatProvider = StreamProvider<List<ChatMessage>>((ref) {
   final uid = ref.watch(sessionProvider).value?.uid;
@@ -110,110 +109,89 @@ class AuthRepository {
 }
 
 class UserRepository {
-  UserRepository(this.db);
-  final FirebaseFirestore db;
-  final Map<String, Future<void>> _accountInitializations = {};
-  DocumentReference<Map<String, dynamic>> doc(String uid) =>
-      db.collection('users').doc(uid);
-  Stream<UserProfile?> watch(String uid) => doc(uid).snapshots().map(
-    (s) => s.exists ? UserProfile.fromJson(uid, s.data()!) : null,
+  UserRepository(this.api);
+  final HealthBrogetApi api;
+  Stream<UserProfile?> watch(String uid) => watchApi(
+    api,
+    () => api.forUser(uid, () async {
+      final data = await api.request('GET', '/profile');
+      return UserProfile.fromJson(
+        uid,
+        Map<String, dynamic>.from(data['profile']),
+      );
+    }),
   );
-  Future<void> ensureAccount(User user) =>
-      _accountInitializations.putIfAbsent(user.uid, () async {
-        try {
-          await db
-              .runTransaction((tx) async {
-                final snap = await tx.get(doc(user.uid));
-                if (!snap.exists) {
-                  tx.set(doc(user.uid), {
-                    'userId': user.uid,
-                    'name': user.displayName ?? '',
-                    'health': null,
-                    'createdAt': FieldValue.serverTimestamp(),
-                    'updatedAt': FieldValue.serverTimestamp(),
-                  });
-                }
-              })
-              .timeout(const Duration(seconds: 20));
-        } finally {
-          _accountInitializations.remove(user.uid);
-        }
-      });
+  Future<void> ensureAccount(User user) async {
+    await api.forUser(
+      user.uid,
+      () => api.request('POST', '/account/bootstrap', {
+        'name': user.displayName ?? '',
+      }),
+    );
+  }
 
   Future<void> save(String uid, String name, HealthProfile health) async {
     if (!health.valid || name.trim().isEmpty || name.length > 80) {
       throw const FormatException('Invalid profile');
     }
-    await doc(uid)
-        .update({
-          'name': name.trim(),
-          'health': health.toJson(),
-          'updatedAt': FieldValue.serverTimestamp(),
-        })
-        .timeout(const Duration(seconds: 20));
-  }
-
-  Stream<AppSettings> settings(String uid) => doc(uid)
-      .collection('settings')
-      .doc('preferences')
-      .snapshots()
-      .map(
-        (s) => s.exists ? AppSettings.fromJson(s.data()!) : const AppSettings(),
-      );
-  Future<void> saveSettings(String uid, AppSettings settings) => doc(uid)
-      .collection('settings')
-      .doc('preferences')
-      .set(settings.toJson())
-      .timeout(const Duration(seconds: 20));
-}
-
-class MealRepository {
-  MealRepository(this.db, this.api);
-  final FirebaseFirestore db;
-  final HealthBrogetApi api;
-  CollectionReference<Map<String, dynamic>> collection(String uid) =>
-      db.collection('users').doc(uid).collection('meals');
-  Query<Map<String, dynamic>> range(String uid, DateTime start, DateTime end) =>
-      collection(uid)
-          .where(
-            'eatenAt',
-            isGreaterThanOrEqualTo: Timestamp.fromDate(start.toUtc()),
-          )
-          .where('eatenAt', isLessThan: Timestamp.fromDate(end.toUtc()))
-          .orderBy('eatenAt');
-  Stream<List<Meal>> watchRange(String uid, DateTime start, DateTime end) =>
-      range(uid, start, end).limit(601).snapshots().map((s) {
-        if (s.size > 600) {
-          throw const FormatException('Too many meals in range');
-        }
-        return s.docs.map((d) => Meal.fromJson(d.id, d.data())).toList();
-      });
-  Future<List<Meal>> report(String uid, DateTime start, DateTime end) async {
-    final s = await range(
+    await api.forUser(
       uid,
-      start,
-      end,
-    ).limit(601).get().timeout(const Duration(seconds: 20));
-    if (s.size > 600) throw const FormatException('Too many meals in range');
-    return s.docs.map((d) => Meal.fromJson(d.id, d.data())).toList();
-  }
-
-  Future<MealPage> page(
-    String uid, {
-    DocumentSnapshot<Map<String, dynamic>>? cursor,
-  }) async {
-    Query<Map<String, dynamic>> q = collection(
-      uid,
-    ).orderBy('eatenAt', descending: true).limit(20);
-    if (cursor != null) q = q.startAfterDocument(cursor);
-    final s = await q.get().timeout(const Duration(seconds: 20));
-    return MealPage(
-      s.docs.map((d) => Meal.fromJson(d.id, d.data())).toList(),
-      s.docs.isEmpty ? null : s.docs.last,
-      s.docs.length == 20,
+      () => api.request('PUT', '/profile', {
+        'name': name.trim(),
+        'health': health.toJson(),
+      }),
     );
   }
 
+  Stream<AppSettings> settings(String uid) => watchApi(
+    api,
+    () => api.forUser(
+      uid,
+      () async => AppSettings.fromJson(await api.request('GET', '/settings')),
+    ),
+  );
+  Future<void> saveSettings(String uid, AppSettings settings) async {
+    await api.forUser(
+      uid,
+      () => api.request('PUT', '/settings', settings.toJson()),
+    );
+  }
+}
+
+class MealRepository {
+  MealRepository(this.api);
+  final HealthBrogetApi api;
+  Future<List<Meal>> report(String uid, DateTime start, DateTime end) =>
+      api.forUser(uid, () async {
+        final query = Uri(
+          queryParameters: {
+            'start': start.toUtc().toIso8601String(),
+            'end': end.toUtc().toIso8601String(),
+          },
+        ).query;
+        final data = await api.request('GET', '/meals?$query');
+        return (data['meals'] as List)
+            .map((m) => Meal.fromJson(m['id'], Map<String, dynamic>.from(m)))
+            .toList();
+      });
+  Stream<List<Meal>> watchRange(String uid, DateTime start, DateTime end) =>
+      watchApi(api, () => report(uid, start, end));
+  Future<MealPage> page(String uid, {String? cursor}) =>
+      api.forUser(uid, () async {
+        final data = await api.request(
+          'GET',
+          cursor == null
+              ? '/meals'
+              : '/meals?cursor=${Uri.encodeQueryComponent(cursor)}',
+        );
+        return MealPage(
+          (data['meals'] as List)
+              .map((m) => Meal.fromJson(m['id'], Map<String, dynamic>.from(m)))
+              .toList(),
+          data['cursor'] as String?,
+          data['hasMore'] == true,
+        );
+      });
   Future<void> save(Meal meal) async {
     if (!mealTypes.contains(meal.mealType) ||
         meal.foods.isEmpty ||
@@ -223,49 +201,48 @@ class MealRepository {
         )) {
       throw const FormatException('Invalid meal');
     }
-    await api.request('PUT', '/meals/${meal.id}', {
-      'id': meal.id,
-      'mealType': meal.mealType,
-      'eatenAt': meal.eatenAt.toUtc().toIso8601String(),
-      'foods': meal.foods.map((f) => f.toJson()).toList(),
-      'imagePath': meal.imagePath,
-      'timeZone': await api.timeZone,
-    });
+    await api.forUser(
+      meal.userId,
+      () async => api.request('PUT', '/meals/${meal.id}', {
+        'id': meal.id,
+        'mealType': meal.mealType,
+        'eatenAt': meal.eatenAt.toUtc().toIso8601String(),
+        'foods': meal.foods.map((f) => f.toJson()).toList(),
+        'imagePath': meal.imagePath,
+        'timeZone': await api.timeZone,
+      }),
+    );
   }
 
   Future<void> delete(String uid, String id) async {
-    await api.request('DELETE', '/meals/$id');
+    await api.forUser(uid, () => api.request('DELETE', '/meals/$id'));
   }
 }
 
 class MealPage {
   MealPage(this.meals, this.cursor, this.hasMore);
   final List<Meal> meals;
-  final DocumentSnapshot<Map<String, dynamic>>? cursor;
+  final String? cursor;
   final bool hasMore;
 }
 
 class ChatRepository {
-  ChatRepository(this.db);
-  final FirebaseFirestore db;
-  CollectionReference<Map<String, dynamic>> collection(String uid) =>
-      db.collection('users').doc(uid).collection('chat');
-  Stream<List<ChatMessage>> watch(String uid) => collection(uid)
-      .orderBy('createdAt', descending: true)
-      .limit(40)
-      .snapshots()
-      .map(
-        (s) => s.docs.reversed
-            .map(
-              (d) => ChatMessage(
-                d.id,
-                d['role'],
-                d['text'],
-                d.data()['createdAt'] == null
-                    ? null
-                    : dateValue(d['createdAt']),
-              ),
-            )
-            .toList(),
-      );
+  ChatRepository(this.api);
+  final HealthBrogetApi api;
+  Stream<List<ChatMessage>> watch(String uid) => watchApi(
+    api,
+    () => api.forUser(uid, () async {
+      final data = await api.request('GET', '/chat');
+      return (data['messages'] as List)
+          .map(
+            (m) => ChatMessage(
+              m['id'],
+              m['role'],
+              m['text'],
+              m['createdAt'] == null ? null : dateValue(m['createdAt']),
+            ),
+          )
+          .toList();
+    }),
+  );
 }

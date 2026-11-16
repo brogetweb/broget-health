@@ -16,7 +16,7 @@ abstract final class AppConfig {
   );
   static const apiUrl = String.fromEnvironment(
     'API_BASE_URL',
-    defaultValue: 'http://localhost:8787',
+    defaultValue: 'http://localhost:8787/api',
   );
   static const downloadUrl = String.fromEnvironment('APP_DOWNLOAD_URL');
   static const recaptcha = String.fromEnvironment('RECAPTCHA_SITE_KEY');

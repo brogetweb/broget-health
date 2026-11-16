@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'dart:typed_data';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
 import 'package:intl/intl.dart';
@@ -7,6 +8,7 @@ import '../../data/repositories/repositories.dart';
 import '../../services/ai/health_broget_service.dart';
 import '../../core/errors/app_error.dart';
 import '../../widgets/common.dart';
+import '../../widgets/meal_photo.dart';
 
 Future<bool?> openMealEditor(
   BuildContext context, {
@@ -16,6 +18,7 @@ Future<bool?> openMealEditor(
   String? imagePath,
   String? stableId,
   DateTime? eatenAt,
+  Uint8List? photoBytes,
 }) => showDialog<bool>(
   context: context,
   barrierDismissible: false,
@@ -26,6 +29,7 @@ Future<bool?> openMealEditor(
     imagePath: imagePath,
     stableId: stableId,
     initialEatenAt: eatenAt,
+    photoBytes: photoBytes,
   ),
 );
 
@@ -38,11 +42,13 @@ class MealEditor extends ConsumerStatefulWidget {
     this.imagePath,
     this.stableId,
     this.initialEatenAt,
+    this.photoBytes,
   });
   final Meal? meal;
   final List<MealFood>? initialFoods;
   final String? initialType, imagePath, stableId;
   final DateTime? initialEatenAt;
+  final Uint8List? photoBytes;
   @override
   ConsumerState<MealEditor> createState() => _MealEditorState();
 }
@@ -57,6 +63,8 @@ class _MealEditorState extends ConsumerState<MealEditor> {
     if (widget.meal == null) ...?widget.initialFoods,
   ];
   bool busy = false;
+  bool retainPhoto = true;
+  String? uploadedPhotoId;
   String? error;
   Future<void> save() async {
     if (foods.isEmpty) {
@@ -69,6 +77,11 @@ class _MealEditorState extends ConsumerState<MealEditor> {
     });
     try {
       final uid = ref.read(sessionProvider).value!.uid;
+      if (retainPhoto && widget.photoBytes != null && uploadedPhotoId == null) {
+        uploadedPhotoId = await ref
+            .read(apiProvider)
+            .uploadPhoto(widget.photoBytes!);
+      }
       await ref
           .read(mealRepositoryProvider)
           .save(
@@ -78,7 +91,11 @@ class _MealEditorState extends ConsumerState<MealEditor> {
               mealType: type,
               eatenAt: eatenAt.toUtc(),
               foods: foods,
-              imagePath: widget.meal?.imagePath ?? widget.imagePath,
+              imagePath: retainPhoto
+                  ? uploadedPhotoId ??
+                        widget.meal?.imagePath ??
+                        widget.imagePath
+                  : null,
             ),
           );
       if (mounted) {
@@ -143,6 +160,25 @@ class _MealEditorState extends ConsumerState<MealEditor> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
+            if (widget.photoBytes != null)
+              Image.memory(
+                widget.photoBytes!,
+                height: 160,
+                fit: BoxFit.contain,
+              ),
+            if (widget.photoBytes == null && widget.meal?.imagePath != null)
+              MealPhoto(id: widget.meal!.imagePath!),
+            if (widget.photoBytes != null || widget.meal?.imagePath != null)
+              CheckboxListTile(
+                value: retainPhoto,
+                onChanged: busy
+                    ? null
+                    : (value) => setState(() => retainPhoto = value ?? true),
+                title: const Text('Keep this photo with my meal'),
+                subtitle: const Text(
+                  'Stored privately. You can remove it by editing or deleting this meal.',
+                ),
+              ),
             Text(
               widget.meal == null
                   ? 'Review & confirm your meal'

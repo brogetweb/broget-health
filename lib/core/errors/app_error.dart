@@ -16,6 +16,16 @@ String friendlyError(Object error) {
     return 'This is taking longer than expected. Check your connection and try again.';
   }
   return switch (code) {
+    'attestation-required' =>
+      'App verification failed. Refresh the app and try again.',
+    'account-unavailable' =>
+      'Your account is unavailable. Please sign in again.',
+    'photo-upload-unavailable' =>
+      'The photo could not be saved. Please try again, or turn off photo storage to save the meal.',
+    'photo-attached' =>
+      'This photo belongs to a saved meal. Edit that meal to remove it.',
+    'service-unavailable' =>
+      'The service is temporarily unavailable. Please try again shortly.',
     'operation-not-allowed' =>
       'Email/password sign-in is not enabled yet. Please contact support.',
     'invalid-api-key' || 'app-not-authorized' || 'configuration-not-found' =>

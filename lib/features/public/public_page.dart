@@ -40,7 +40,7 @@ class PublicPage extends StatelessWidget {
           'Health Broget combines a food journal, photo-assisted recognition, deterministic nutrition tracking and a helpful nutrition assistant.',
           'A photograph cannot reveal exact ingredients, cooking oils or portion weights. All food recognition and nutrition values are estimates.',
           'Targets use the Mifflin–St Jeor equation and activity factors. They are general estimates, not medical advice. Children and people with special care needs should consult a qualified professional.',
-          'Your records are private to your account. Photo storage is coming soon; photos used for analysis are not saved. You can delete your account in settings.',
+          'Your records are private to your account. Photos are saved privately only when you choose to keep them with a meal. You can delete your account in settings.',
         ],
       ),
       '/privacy': (
@@ -49,7 +49,7 @@ class PublicPage extends StatelessWidget {
         [
           'We process account email and name, your nutrition profile, meal records, assistant conversations, user-confirmed assistant notes and reminder preferences/history to operate your account. Optional analytics is off by default.',
           'When you choose to scan a photo or use the assistant, relevant image content and bounded nutrition context are sent to an external AI processor. The app does not claim that processing stays on your device. Do not upload people, documents or private information unrelated to food.',
-          'Food photos are resized and sent for analysis but are not saved by the app. Photo storage is coming soon. Structured scan results are cached for up to one hour. Assistant requests use limited recent messages, your confirmed notes and relevant nutrition summaries instead of your entire history. You can clear chat, edit remembered notes or delete meals.',
+          'Food photos are resized and sent for analysis. If you choose to keep a photo with a meal, it is stored privately with Cloudinary; application records are stored in MongoDB. Unattached uploads are scheduled for cleanup. Structured scan results are cached for up to one hour. Assistant requests use limited recent messages, your confirmed notes and relevant nutrition summaries instead of your entire history. You can clear chat, edit remembered notes or delete meals.',
           'Records remain until you delete them or your account. Account deletion removes the account, meal data, chat and cached analysis. Operational quotas expire. Offline device caches may persist until application data is cleared.',
           'Before a public launch, the service operator must publish its legal identity, contact address, processing region, processor agreement, retention schedule and applicable privacy rights in the deployed policy. This policy must match that actual configuration.',
         ],

@@ -139,6 +139,7 @@ class _ScannerPageState extends ConsumerState<ScannerPage> {
         mealType: analysis!.mealType,
         stableId: id,
         eatenAt: photoTime,
+        photoBytes: bytes,
       );
       if (saved == true) {
         if (mounted) {
@@ -248,7 +249,7 @@ class _ScannerPageState extends ConsumerState<ScannerPage> {
                 'I agree to process this food image for analysis.',
               ),
               subtitle: const Text(
-                'The resized photo is sent for analysis but is not saved. Avoid people and private information. Photo storage is coming soon.',
+                'The resized photo is sent for analysis. You can choose whether to save it privately with your meal on the review screen. Avoid people and private information.',
               ),
             ),
             if (busy) const LoadingPanel(message: 'Analyzing your photo…'),

@@ -1,5 +1,3 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
-
 double number(dynamic value) {
   if (value is! num || !value.isFinite) {
     throw const FormatException('Invalid number');
@@ -7,9 +5,7 @@ double number(dynamic value) {
   return value.toDouble();
 }
 
-DateTime dateValue(dynamic value) => value is Timestamp
-    ? value.toDate().toUtc()
-    : DateTime.parse(value as String).toUtc();
+DateTime dateValue(dynamic value) => DateTime.parse(value as String).toUtc();
 const mealTypes = ['breakfast', 'lunch', 'dinner', 'snack'];
 String dayKey(DateTime date) =>
     '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
@@ -278,7 +274,7 @@ class Meal {
   Map<String, dynamic> toJson() => {
     'userId': userId,
     'mealType': mealType,
-    'eatenAt': Timestamp.fromDate(eatenAt.toUtc()),
+    'eatenAt': eatenAt.toUtc().toIso8601String(),
     'foods': foods.map((f) => f.toJson()).toList(),
     'imagePath': imagePath,
     'analysisVersion': 1,
