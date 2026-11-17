@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'required_label.dart';
 
 // The field's controller, focus and autofill identity stay stable when the
@@ -30,6 +31,10 @@ class _PasswordFieldState extends State<PasswordField> {
   bool hidden = true;
   void toggle() {
     final selection = widget.controller.selection;
+    // Flutter web's updateConfig can orphan the active autofill DOM input
+    // when obscureText changes (flutter/flutter#192102). Close it first and
+    // mount a fresh editor instead of reconfiguring that connection.
+    if (kIsWeb) widget.focusNode.unfocus();
     setState(() => hidden = !hidden);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
@@ -42,6 +47,7 @@ class _PasswordFieldState extends State<PasswordField> {
 
   @override
   Widget build(BuildContext context) => TextFormField(
+    key: kIsWeb ? ValueKey(hidden) : null,
     controller: widget.controller,
     focusNode: widget.focusNode,
     keyboardType: TextInputType.visiblePassword,
@@ -59,6 +65,7 @@ class _PasswordFieldState extends State<PasswordField> {
       helperText: widget.helperText,
       errorMaxLines: 3,
       suffixIcon: IconButton(
+        focusNode: _visibilityFocus,
         onPressed: toggle,
         tooltip: widget.confirmation
             ? (hidden ? 'Show confirmation' : 'Hide confirmation')
@@ -71,4 +78,12 @@ class _PasswordFieldState extends State<PasswordField> {
     validator: widget.validator,
     onFieldSubmitted: widget.onSubmitted,
   );
+
+  final _visibilityFocus = FocusNode(canRequestFocus: false);
+
+  @override
+  void dispose() {
+    _visibilityFocus.dispose();
+    super.dispose();
+  }
 }
